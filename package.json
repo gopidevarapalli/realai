@@ -9,7 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/groq": "^3.0.39",
+    "@nanostores/react": "github:ai/react",
+    "ai": "^6.0.182",
     "next": "16.2.6",
+    "next-auth": "^4.24.14",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
