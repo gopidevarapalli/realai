@@ -2,12 +2,13 @@ import { NextRequest } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { pipeline } from '@xenova/transformers';
+
 
 let embedder: any = null;
 
 async function getEmbedder() {
     if (!embedder) {
+        const { pipeline } = await import('@xenova/transformers');
         embedder = await pipeline(
             'feature-extraction',
             'Xenova/all-MiniLM-L6-v2'
