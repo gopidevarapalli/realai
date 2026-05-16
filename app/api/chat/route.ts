@@ -1,3 +1,4 @@
+process.env.TRANSFORMERS_NO_NODE = "1";
 import { createGroq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import clientPromise from '@/lib/mongodb';

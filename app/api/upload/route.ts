@@ -1,3 +1,4 @@
+process.env.TRANSFORMERS_NO_NODE = "1";
 import { NextRequest } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
