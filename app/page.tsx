@@ -43,7 +43,30 @@ export default function ChatApp() {
 
   const [memory, setMemory] = useState<UserMemory>({});
   const [skillsInput, setSkillsInput] = useState('');
-
+  // Add these state variables at the top with your other useState calls
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState('');
+  // Add this function with your other functions
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setUploadedFile(data.filename);
+        alert(`✅ "${data.filename}" uploaded! ${data.chunks} chunks indexed.`);
+      } else {
+        alert('Upload failed: ' + data.error);
+      }
+    } catch (err) {
+      alert('Upload error');
+    }
+    setUploading(false);
+  };
   useEffect(() => {
     const stored = loadChats();
     if (stored.length > 0) {
@@ -922,6 +945,34 @@ textarea::placeholder {
             <button className="new-chat-btn" onClick={createNewChat} title="New chat">+</button>
           </div>
           <div className="chat-list">
+            {/* PDF Upload */}
+            <div style={{ padding: '8px', borderBottom: '1px solid #1e1e1e' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '9px 10px', borderRadius: 8,
+                border: '1px dashed #2a2a2a', cursor: 'pointer',
+                fontSize: 12, color: uploading ? '#555' : '#666',
+                transition: 'all 0.15s',
+              }}>
+                <span style={{ fontSize: 14 }}>
+                  {uploading ? '⏳' : uploadedFile ? '📄' : '📎'}
+                </span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {uploading
+                    ? 'Uploading & indexing...'
+                    : uploadedFile
+                      ? uploadedFile
+                      : 'Upload PDF to chat with it'}
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handlePDFUpload}
+                  style={{ display: 'none' }}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
             {chats.map(chat => (
               <div
                 key={chat.id}
