@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Providers from './providers';
 
-export const metadata: Metadata = { title: 'Chroma AI' };
+export const metadata: Metadata = { title: 'AI Real' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -25,7 +25,7 @@ export default function LoginPage() {
                     <h1 style={{
                         fontFamily: 'Instrument Serif, serif', fontSize: 26,
                         color: '#e8e4dc', marginBottom: 8, fontWeight: 400,
-                    }}>Welcome to Chroma AI</h1>
+                    }}>Welcome to AI Real</h1>
                     <p style={{ fontSize: 13, color: '#555', marginBottom: 36, lineHeight: 1.6 }}>
                         Sign in to start chatting and save your history
                     </p>
