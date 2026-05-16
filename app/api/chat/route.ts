@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 process.env.TRANSFORMERS_NO_NODE = "1";
@@ -13,7 +14,14 @@ let embedder: any = null;
 async function getEmbedder() {
     if (!embedder) {
 
-        const { env, pipeline } = await import('@xenova/transformers');
+        const transformers = await import('@xenova/transformers');
+
+        const env = transformers.env;
+        const pipeline = transformers.pipeline;
+
+        // FORCE WASM
+        env.backends.onnx.wasm.wasmPaths =
+            'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
         env.allowLocalModels = false;
         env.useBrowserCache = false;
