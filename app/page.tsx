@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession, signOut, signIn } from 'next-auth/react'; // ← add this
 import SettingsModal from '@/components/SettingsModal';
+import ReactMarkdown from 'react-markdown';
 
 import {
   loadMemory,
@@ -1066,7 +1067,7 @@ textarea::placeholder {
                           <div className="dot" /><div className="dot" /><div className="dot" />
                         </div>
                       ) : (
-                        <div className="bubble-text">{m.content}</div>
+                          <div className="bubble-text"><ReactMarkdown>{m.content}</ReactMarkdown></div>
                       )}
                     </div>
                   </div>
