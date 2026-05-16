@@ -1,14 +1,11 @@
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Force Transformers to bypass native node modules and look for pure JS/WASM
 process.env.TRANSFORMERS_NO_NODE = "1";
 process.env.XENOVA_DIST_ONLY = "1";
 
 import { NextRequest } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-
-// Using WebPDFLoader to prevent Vercel dependency/binary resolution errors
 import { WebPDFLoader } from '@langchain/community/document_loaders/web/pdf';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
@@ -17,36 +14,25 @@ let embedder: any = null;
 async function getEmbedder() {
     if (!embedder) {
         const transformers = await import('@xenova/transformers');
-
         const env = transformers.env;
         const pipeline = transformers.pipeline;
 
-        // FORCE WASM
-        env.backends.onnx.wasm.wasmPaths =
-            'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-
+        env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
         env.allowLocalModels = false;
         env.useBrowserCache = false;
-
         env.backends.onnx.wasm.numThreads = 1;
 
-        embedder = await pipeline(
-            'feature-extraction',
-            'Xenova/all-MiniLM-L6-v2'
-        );
+        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     }
-
     return embedder;
 }
 
 async function embedText(text: string): Promise<number[]> {
     const embed = await getEmbedder();
-
     const output = await embed(text, {
         pooling: 'mean',
         normalize: true,
     });
-
     return Array.from(output.data);
 }
 
@@ -56,17 +42,13 @@ export async function POST(req: NextRequest) {
         const file = formData.get('file') as File;
 
         if (!file) {
-            return Response.json(
-                { error: 'No file provided' },
-                { status: 400 }
-            );
+            return Response.json({ error: 'No file provided' }, { status: 400 });
         }
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         const blob = new Blob([buffer], { type: 'application/pdf' });
 
-        // Safe Web Loader execution layer
         const loader = new WebPDFLoader(blob);
         const docs = await loader.load();
 
@@ -76,7 +58,6 @@ export async function POST(req: NextRequest) {
         });
 
         const chunks = await splitter.splitDocuments(docs);
-
         console.log(`PDF parsed: ${chunks.length} chunks`);
 
         const rows = await Promise.all(
@@ -93,7 +74,6 @@ export async function POST(req: NextRequest) {
 
         const client = await clientPromise;
         const collection = client.db('realai').collection('documents');
-
         await collection.insertMany(rows);
 
         console.log(`Saved ${rows.length} chunks to MongoDB`);
@@ -103,12 +83,8 @@ export async function POST(req: NextRequest) {
             chunks: rows.length,
             filename: file.name,
         });
-
     } catch (err: any) {
         console.error('Upload error:', err);
-        return Response.json(
-            { error: err.message },
-            { status: 500 }
-        );
+        return Response.json({ error: err.message }, { status: 500 });
     }
 }
