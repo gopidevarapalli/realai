@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Force Transformers to bypass native node modules and look for pure JS/WASM
 process.env.TRANSFORMERS_NO_NODE = "1";
+process.env.XENOVA_DIST_ONLY = "1";
 
 import { createGroq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
@@ -13,7 +15,6 @@ let embedder: any = null;
 
 async function getEmbedder() {
     if (!embedder) {
-
         const transformers = await import('@xenova/transformers');
 
         const env = transformers.env;
@@ -26,7 +27,7 @@ async function getEmbedder() {
         env.allowLocalModels = false;
         env.useBrowserCache = false;
 
-        // Force WASM backend
+        // Force WASM backend single thread for serverless efficiency
         env.backends.onnx.wasm.numThreads = 1;
 
         embedder = await pipeline(
@@ -51,11 +52,9 @@ async function embedText(text: string): Promise<number[]> {
 
 async function searchDocuments(query: string): Promise<string> {
     try {
-
         const queryEmbedding = await embedText(query);
 
         const client = await clientPromise;
-
         const collection = client
             .db('realai')
             .collection('documents');
@@ -89,15 +88,12 @@ async function searchDocuments(query: string): Promise<string> {
             .join('\n\n---\n\n');
 
     } catch (err) {
-
         console.error('Vector search error:', err);
-
         return '';
     }
 }
 
 export async function POST(req: Request) {
-
     const { messages, memory } = await req.json();
 
     const lastMessage =

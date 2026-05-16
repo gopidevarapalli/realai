@@ -1,23 +1,21 @@
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Force Transformers to bypass native node modules and look for pure JS/WASM
 process.env.TRANSFORMERS_NO_NODE = "1";
+process.env.XENOVA_DIST_ONLY = "1";
 
 import { NextRequest } from 'next/server';
-
 import clientPromise from '@/lib/mongodb';
 
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-
-import { RecursiveCharacterTextSplitter }
-    from '@langchain/textsplitters';
+// Using WebPDFLoader to prevent Vercel dependency/binary resolution errors
+import { WebPDFLoader } from '@langchain/community/document_loaders/web/pdf';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
 let embedder: any = null;
 
 async function getEmbedder() {
-
     if (!embedder) {
-
         const transformers = await import('@xenova/transformers');
 
         const env = transformers.env;
@@ -29,7 +27,6 @@ async function getEmbedder() {
 
         env.allowLocalModels = false;
         env.useBrowserCache = false;
-
 
         env.backends.onnx.wasm.numThreads = 1;
 
@@ -43,7 +40,6 @@ async function getEmbedder() {
 }
 
 async function embedText(text: string): Promise<number[]> {
-
     const embed = await getEmbedder();
 
     const output = await embed(text, {
@@ -55,15 +51,11 @@ async function embedText(text: string): Promise<number[]> {
 }
 
 export async function POST(req: NextRequest) {
-
     try {
-
         const formData = await req.formData();
-
         const file = formData.get('file') as File;
 
         if (!file) {
-
             return Response.json(
                 { error: 'No file provided' },
                 { status: 400 }
@@ -71,63 +63,40 @@ export async function POST(req: NextRequest) {
         }
 
         const bytes = await file.arrayBuffer();
-
         const buffer = Buffer.from(bytes);
+        const blob = new Blob([buffer], { type: 'application/pdf' });
 
-        const blob = new Blob(
-            [buffer],
-            { type: 'application/pdf' }
-        );
-
-        const loader = new PDFLoader(blob);
-
+        // Safe Web Loader execution layer
+        const loader = new WebPDFLoader(blob);
         const docs = await loader.load();
 
-        const splitter =
-            new RecursiveCharacterTextSplitter({
-                chunkSize: 500,
-                chunkOverlap: 50,
-            });
+        const splitter = new RecursiveCharacterTextSplitter({
+            chunkSize: 500,
+            chunkOverlap: 50,
+        });
 
-        const chunks =
-            await splitter.splitDocuments(docs);
+        const chunks = await splitter.splitDocuments(docs);
 
-        console.log(
-            `PDF parsed: ${chunks.length} chunks`
-        );
+        console.log(`PDF parsed: ${chunks.length} chunks`);
 
         const rows = await Promise.all(
-
             chunks.map(async (chunk) => ({
-
                 content: chunk.pageContent,
-
-                embedding: await embedText(
-                    chunk.pageContent
-                ),
-
+                embedding: await embedText(chunk.pageContent),
                 metadata: {
                     filename: file.name,
-                    page:
-                        chunk.metadata?.loc?.pageNumber || 0,
+                    page: chunk.metadata?.loc?.pageNumber || 0,
                 },
-
                 createdAt: new Date(),
-
             }))
         );
 
         const client = await clientPromise;
-
-        const collection =
-            client.db('realai')
-                .collection('documents');
+        const collection = client.db('realai').collection('documents');
 
         await collection.insertMany(rows);
 
-        console.log(
-            `Saved ${rows.length} chunks to MongoDB`
-        );
+        console.log(`Saved ${rows.length} chunks to MongoDB`);
 
         return Response.json({
             success: true,
@@ -136,9 +105,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (err: any) {
-
         console.error('Upload error:', err);
-
         return Response.json(
             { error: err.message },
             { status: 500 }
