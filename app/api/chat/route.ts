@@ -52,13 +52,14 @@ async function embedText(text: string): Promise<number[]> {
 
 async function searchDocuments(query: string): Promise<string> {
     try {
+        console.log('query=', query)
         const queryEmbedding = await embedText(query);
 
         const client = await clientPromise;
         const collection = client
             .db('realai')
             .collection('documents');
-
+        console.log('collection=', collection);
         const results = await collection.aggregate([
             {
                 $vectorSearch: {
