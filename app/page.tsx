@@ -33,7 +33,7 @@ export default function ChatApp() {
   const [activeChatId, setActiveChatId] = useState<string>('');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -191,80 +191,685 @@ export default function ChatApp() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; background: #0f0f0f; color: #e8e4dc; font-family: 'DM Sans', sans-serif; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2e2e2e; border-radius: 4px; }
-        .app { display: flex; height: 100vh; overflow: hidden; }
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
 
-        /* Sidebar */
-        .sidebar { width: ${sidebarOpen ? '260px' : '0px'}; min-width: ${sidebarOpen ? '260px' : '0px'}; background: #141414; border-right: 1px solid #1e1e1e; display: flex; flex-direction: column; overflow: hidden; transition: all 0.25s ease; }
-        .sidebar-header { padding: 18px 16px 12px; border-bottom: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; }
-        .sidebar-logo { font-family: 'Instrument Serif', serif; font-size: 17px; color: #e8e4dc; letter-spacing: -0.3px; }
-        .new-chat-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #2a2a2a; background: transparent; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; transition: all 0.15s; }
-        .new-chat-btn:hover { background: #1e1e1e; color: #e8e4dc; }
-        .chat-list { flex: 1; overflow-y: auto; padding: 8px; }
-        .chat-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; cursor: pointer; transition: background 0.12s; gap: 8px; }
-        .chat-item:hover { background: #1a1a1a; }
-        .chat-item.active { background: #1e1e1e; }
-        .chat-item-left { flex: 1; min-width: 0; }
-        .chat-item-title { font-size: 13px; color: #c8c4bc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
-        .chat-item.active .chat-item-title { color: #e8e4dc; }
-        .chat-item-date { font-size: 11px; color: #555; margin-top: 2px; }
-        .delete-btn { width: 22px; height: 22px; border-radius: 4px; border: none; background: transparent; color: #444; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; opacity: 0; transition: all 0.12s; flex-shrink: 0; }
-        .chat-item:hover .delete-btn { opacity: 1; }
-        .delete-btn:hover { background: #2a1515; color: #e05555; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-        /* Main */
-        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .topbar { padding: 14px 20px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 12px; background: #0f0f0f; }
-        .toggle-sidebar { width: 32px; height: 32px; border-radius: 7px; border: 1px solid #1e1e1e; background: transparent; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-        .toggle-sidebar:hover { background: #1a1a1a; color: #e8e4dc; }
-        .chat-title-bar { font-family: 'Instrument Serif', serif; font-size: 15px; color: #888; font-style: italic; }
-        .model-badge { margin-left: auto; font-size: 11px; color: #444; background: #161616; border: 1px solid #1e1e1e; border-radius: 20px; padding: 3px 10px; }
+html, body {
+  height: 100%;
+  overflow: hidden;
 
-        /* Messages */
-        .messages { flex: 1; overflow-y: auto; padding: 32px 0; }
-        .messages-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; }
-        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; padding-bottom: 80px; }
-        .empty-icon { font-family: 'Instrument Serif', serif; font-size: 48px; color: #2a2a2a; }
-        .empty-title { font-family: 'Instrument Serif', serif; font-size: 26px; color: #3a3a3a; }
-        .empty-sub { font-size: 13px; color: #444; }
+  background: #f5f7fb;
 
-        .message-row { display: flex; gap: 12px; margin-bottom: 28px; animation: fadeUp 0.2s ease; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .message-row.user { flex-direction: row-reverse; }
-        .avatar { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; margin-top: 2px; }
-        .avatar.user { background: #1e2a3a; color: #5b9bd5; font-family: 'DM Sans', sans-serif; }
-        .avatar.ai { background: #1a1f1a; color: #5b9b6a; font-size: 14px; }
-        .bubble { max-width: 82%; }
-        .bubble.user { align-items: flex-end; }
-        .bubble-text { padding: 11px 15px; border-radius: 12px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
-        .user .bubble-text { background: #1a2535; color: #c8dff5; border-bottom-right-radius: 3px; }
-        .ai .bubble-text { background: #161616; color: #d8d4cc; border: 1px solid #1e1e1e; border-bottom-left-radius: 3px; }
-        .typing { display: flex; gap: 4px; padding: 14px 15px; background: #161616; border: 1px solid #1e1e1e; border-radius: 12px; border-bottom-left-radius: 3px; width: fit-content; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; background: #444; animation: bounce 1.2s infinite; }
-        .dot:nth-child(2) { animation-delay: 0.2s; }
-        .dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); background: #666; } }
+  color: #111827;
 
-        /* Input */
-        .input-area { padding: 16px 24px 24px; background: #0f0f0f; }
-        .input-wrap { max-width: 680px; margin: 0 auto; background: #141414; border: 1px solid #232323; border-radius: 14px; display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; transition: border-color 0.15s; }
-        .input-wrap:focus-within { border-color: #2e3e50; }
-        textarea { flex: 1; background: transparent; border: none; outline: none; color: #e8e4dc; font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.6; resize: none; max-height: 140px; min-height: 24px; overflow-y: auto; }
-        textarea::placeholder { color: #444; }
-        .send-btn { width: 34px; height: 34px; border-radius: 8px; border: none; background: #1e3a5f; color: #5b9bd5; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
-        .send-btn:hover:not(:disabled) { background: #1e4a7f; color: #7bb8f5; }
-        .send-btn:disabled { background: #161616; color: #333; cursor: not-allowed; }
-        .input-hint { text-align: center; font-size: 11px; color: #333; margin-top: 8px; max-width: 680px; margin-left: auto; margin-right: auto; }
-      `}</style>
+  font-family: 'DM Sans', sans-serif;
+}
+
+::selection {
+  background: rgba(59,130,246,0.35);
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 20px;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+
+.sidebar {
+  width: ${sidebarOpen ? '290px' : '0px'};
+  min-width: ${sidebarOpen ? '290px' : '0px'};
+
+  background: #ffffff;
+
+  border-right: 1px solid #dbe3ee;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  transition: all 0.25s ease;
+}
+
+.sidebar-header {
+  padding: 22px 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom: 1px solid #eef2f7;
+
+  background: white;
+}
+
+.sidebar-logo {
+  font-family: 'Instrument Serif', serif;
+
+  font-size: 34px;
+
+  color: #111827;
+
+  letter-spacing: -1px;
+
+  font-weight: 600;
+}
+
+.new-chat-btn {
+  width: 44px;
+  height: 44px;
+
+  border-radius: 14px;
+
+  border: 1px solid #dbe3ee;
+
+  background: white;
+
+  color: #111827;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 24px;
+
+  transition: all 0.18s ease;
+
+  box-shadow:
+    0 2px 8px rgba(15,23,42,0.04);
+}
+
+.new-chat-btn:hover {
+  background: #eff6ff;
+
+  border-color: #bfdbfe;
+
+  color: #2563eb;
+
+  transform: translateY(-1px);
+}
+
+.chat-list {
+  flex: 1;
+
+  overflow-y: auto;
+
+  padding: 14px;
+}
+
+.chat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 14px;
+
+  border-radius: 18px;
+
+  cursor: pointer;
+
+  transition: all 0.18s ease;
+
+  margin-bottom: 8px;
+
+  border: 1px solid transparent;
+}
+
+.chat-item:hover {
+  background: #f3f4f6;
+
+  border-color: #d1d5db;
+}
+
+.chat-item.active {
+  background: #dbeafe;
+
+  border: 1px solid #93c5fd;
+}
+
+.chat-item-title {
+  font-size: 14px;
+
+  color: #111827;
+
+  font-weight: 600;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-item-date {
+  font-size: 12px;
+
+  color: #6b7280;
+
+  margin-top: 5px;
+}
+
+.delete-btn {
+  width: 28px;
+  height: 28px;
+
+  border-radius: 10px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #777;
+
+  cursor: pointer;
+
+  opacity: 0;
+
+  transition: all 0.18s ease;
+}
+
+.chat-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: rgba(239,68,68,0.12);
+
+  color: #ef4444;
+}
+
+/* Main */
+
+.main {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  position: relative;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f8fafc 0%,
+      #f5f7fb 100%
+    );
+}
+
+.topbar {
+  padding: 18px 24px;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  border-bottom: 1px solid #dbe3ee;
+
+  background: rgba(255,255,255,0.95);
+
+  backdrop-filter: blur(14px);
+
+  position: sticky;
+  top: 0;
+
+  z-index: 10;
+}
+
+.toggle-sidebar {
+  width: 44px;
+  height: 44px;
+
+  border-radius: 14px;
+
+  border: 1px solid #dbe3ee;
+
+  background: white;
+
+  color: #111827;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.18s ease;
+
+  box-shadow:
+    0 2px 8px rgba(15,23,42,0.04);
+}
+
+.toggle-sidebar:hover {
+  background: #eff6ff;
+
+  border-color: #bfdbfe;
+
+  color: #2563eb;
+
+  transform: translateY(-1px);
+}
+
+.chat-title-bar {
+  font-family: 'Instrument Serif', serif;
+
+  font-size: 24px;
+
+  color: #111827;
+
+  letter-spacing: -0.8px;
+}
+
+.model-badge {
+  margin-left: auto;
+
+  padding: 8px 14px;
+
+  border-radius: 999px;
+
+  background: #eff6ff;
+
+  border: 1px solid #bfdbfe;
+
+  color: #2563eb;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+/* Messages */
+
+.messages {
+  flex: 1;
+
+  overflow-y: auto;
+
+  padding: 36px 0;
+
+  background: #f8fafc;
+}
+
+.messages-inner {
+  max-width: 860px;
+
+  margin: 0 auto;
+
+  padding: 0 28px 120px;
+}
+
+.empty-state {
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 16px;
+}
+
+.empty-icon {
+  font-size: 58px;
+
+  color: #2563eb;
+
+  opacity: 0.9;
+}
+
+.empty-title {
+  font-family: 'Instrument Serif', serif;
+
+  font-size: 56px;
+
+  line-height: 1;
+
+  color: #111827;
+
+  letter-spacing: -2px;
+
+  text-align: center;
+}
+
+.empty-sub {
+  color: #6b7280;
+
+  font-size: 15px;
+
+  text-align: center;
+}
+
+.message-row {
+  display: flex;
+
+  gap: 14px;
+
+  margin-bottom: 32px;
+
+  animation: fadeUp 0.22s ease;
+}
+
+.message-row.user {
+  flex-direction: row-reverse;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  font-size: 13px;
+
+  font-weight: 600;
+}
+
+.avatar.user {
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb,
+      #1d4ed8
+    );
+
+  color: white;
+
+  box-shadow:
+    0 10px 25px rgba(37,99,235,0.28);
+}
+
+.avatar.ai {
+  background:
+    linear-gradient(
+      135deg,
+      #10b981,
+      #059669
+    );
+
+  color: white;
+}
+
+.bubble {
+  max-width: 82%;
+}
+
+.bubble-text {
+  padding: 16px 18px;
+
+  border-radius: 24px;
+
+  font-size: 15px;
+
+  line-height: 1.85;
+
+  white-space: pre-wrap;
+
+  word-break: break-word;
+}
+
+.user .bubble-text {
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb,
+      #1d4ed8
+    );
+
+  color: white;
+
+  border-bottom-right-radius: 8px;
+
+  box-shadow:
+    0 12px 30px rgba(37,99,235,0.25);
+}
+
+.ai .bubble-text {
+  background: white;
+
+  color: #111827;
+
+  border: 1px solid #e5e7eb;
+
+  border-bottom-left-radius: 8px;
+
+  box-shadow:
+    0 2px 10px rgba(15,23,42,0.05);
+}
+
+.typing {
+  display: flex;
+
+  gap: 5px;
+
+  padding: 16px 18px;
+
+  border-radius: 20px;
+
+  background: rgba(255,255,255,0.04);
+
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #6b7280;
+
+  animation: bounce 1.2s infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+  0%,60%,100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Input */
+
+.input-area {
+  padding: 20px 24px 30px;
+
+  background: #f8fafc;
+}
+
+.input-wrap {
+  max-width: 860px;
+
+  margin: 0 auto;
+
+  background: #ffffff;
+
+  border: 1px solid #cbd5e1;
+
+  border-radius: 30px;
+
+  display: flex;
+  align-items: flex-end;
+
+  gap: 10px;
+
+  padding: 16px 18px;
+
+  transition: all 0.18s ease;
+
+  box-shadow:
+    0 6px 20px rgba(15,23,42,0.08);
+}
+
+.input-wrap:focus-within {
+  border-color: #60a5fa;
+
+  box-shadow:
+    0 0 0 4px rgba(59,130,246,0.10),
+    0 10px 25px rgba(15,23,42,0.08);
+}
+
+textarea {
+  flex: 1;
+
+  background: transparent;
+
+  border: none;
+
+  outline: none;
+
+  color: #111827;
+
+  font-size: 16px;
+
+  line-height: 1.8;
+
+  resize: none;
+
+  max-height: 140px;
+
+  min-height: 26px;
+
+  overflow-y: auto;
+
+  font-family: 'DM Sans', sans-serif;
+
+  font-weight: 500;
+}
+
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+.send-btn {
+  width: 52px;
+  height: 52px;
+
+  border-radius: 18px;
+
+  border: none;
+
+  background:
+    linear-gradient(
+      135deg,
+      #3b82f6,
+      #2563eb
+    );
+
+  color: white;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.18s ease;
+
+  box-shadow:
+    0 10px 24px rgba(37,99,235,0.25);
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.03);
+
+  box-shadow:
+    0 16px 34px rgba(37,99,235,0.38);
+}
+
+.send-btn:disabled {
+  opacity: 0.45;
+
+  cursor: not-allowed;
+}
+
+.input-hint {
+  text-align: center;
+
+  font-size: 12px;
+
+  color: #64748b;
+
+  margin-top: 12px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+    bottom: 0;
+
+    z-index: 100;
+  }
+
+  .messages-inner {
+    padding: 0 16px 120px;
+  }
+
+  .bubble {
+    max-width: 92%;
+  }
+
+  .empty-title {
+    font-size: 42px;
+  }
+
+  .chat-title-bar {
+    font-size: 18px;
+  }
+}
+`}</style>
 
       <div className="app">
         {/* Sidebar */}
-        <div className="sidebar">
+        {sidebarOpen && <div className="sidebar">
           <div className="sidebar-header">
             <span className="sidebar-logo">Real AI</span>
             <button className="new-chat-btn" onClick={createNewChat} title="New chat">+</button>
@@ -288,22 +893,36 @@ export default function ChatApp() {
           {/* Settings */}
           {session?.user && <button
             onClick={() => setSettingsOpen(true)}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#eff6ff';
+              e.currentTarget.style.borderColor = '#bfdbfe';
+            }}
+
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#dbe3ee';
+            }}
             style={{
-              background: 'transparent',
-              border: '1px solid #2a2a2a',
-              borderRadius: 6,
-              color: '#888',
-              fontSize: 11,
-              padding: '4px 8px',
+              background: '#ffffff',
+              border: '1px solid #dbe3ee',
+              borderRadius: 12,
+              color: '#111827',
+              fontSize: 13,
+              fontWeight: 500,
+              padding: '12px 14px',
               cursor: 'pointer',
-              marginTop: 6,
+              margin: '12px',
+              transition: 'all 0.18s ease',
+              boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
             }}
           >
             ⚙ Settings
           </button>}
           {/* Bottom of sidebar */}
           <div style={{
-            padding: '12px 16px', borderTop: '1px solid #1e1e1e',
+            padding: '18px',
+            borderTop: '1px solid #eef2f7',
+            background: '#ffffff',
           }}>
             {session?.user ? (<>
               {/*  Logged in — show profile + sign out */}
@@ -314,28 +933,47 @@ export default function ChatApp() {
                   : <div style={{
                     width: 28, height: 28, borderRadius: '50%',
                     background: '#1e2a3a', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 12, color: '#5b9bd5', fontWeight: 500
+                    justifyContent: 'center', fontWeight: 600, color: '#111827'
                   }}>
                     {session.user.name?.[0]?.toUpperCase() || 'U'}
                   </div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: 12, color: '#c8c4bc', overflow: 'hidden',
+                    fontSize: 14, color: 'black', overflow: 'hidden',
                     textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                   }}>
                     {session.user.name}
                   </div>
-                  <div style={{ fontSize: 11, color: '#444' }}>
+                  <div style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    marginTop: 2,
+                  }}>
                     {session.user.email}
                   </div>
                 </div>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#fee2e2';
+                    e.currentTarget.style.borderColor = '#fecaca';
+                  }}
+
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#dbe3ee';
+                  }}
                   style={{
-                    background: 'transparent', border: '1px solid #2a2a2a',
-                    borderRadius: 6, color: '#555', fontSize: 11,
-                    padding: '4px 8px', cursor: 'pointer'
+                    background: 'white',
+                    border: '1px solid #dbe3ee',
+                    borderRadius: 10,
+                    color: '#111827',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
                   }}
                 >
                   Out
@@ -367,13 +1005,13 @@ export default function ChatApp() {
               </button>
             )}
           </div>
-        </div>
+        </div>}
 
 
         {/* Main */}
         <div className="main">
           <div className="topbar">
-            <button className="toggle-sidebar" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            <button className="toggle-sidebar" onClick={() => setSidebarOpen((prev) => !prev)}>
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <rect x="1" y="3" width="13" height="1.5" rx="0.75" fill="currentColor" />
                 <rect x="1" y="7" width="13" height="1.5" rx="0.75" fill="currentColor" />
@@ -381,7 +1019,31 @@ export default function ChatApp() {
               </svg>
             </button>
             <span className="chat-title-bar">{activeChat?.title || 'New chat'}</span>
-            <span className="model-badge">Llama 3.3 · Groq</span>
+            {/* <span className="model-badge">Llama 3.3 · Groq</span> */}
+            {!(session?.user) && <span className="model-badge">
+              <button
+                onClick={() => signIn('google')}
+                style={{
+                  width: '100%', padding: '2px 14px',
+                  background: '#1a1a1a', border: '1px solid #2a2a2a',
+                  borderRadius: 10, color: '#c8c4bc', fontSize: 13,
+                  fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, transition: 'all 0.15s',
+                }}
+                onMouseOver={e => (e.currentTarget.style.background = '#222')}
+                onMouseOut={e => (e.currentTarget.style.background = '#1a1a1a')}
+              >
+                <svg width="16" height="16" viewBox="0 0 18 18">
+                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+                  <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
+                  <path fill="#EA4335" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+                </svg>
+                Sign in with Google
+              </button>
+            </span>}
           </div>
 
           <div className="messages">
