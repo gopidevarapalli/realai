@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useSession, signOut, signIn } from 'next-auth/react'; // ← add this
 import SettingsModal from '@/components/SettingsModal';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 import {
   loadMemory,
@@ -638,8 +640,6 @@ html, body {
 
   line-height: 1.85;
 
-  white-space: pre-wrap;
-
   word-break: break-word;
 }
 
@@ -866,6 +866,52 @@ textarea::placeholder {
     font-size: 18px;
   }
 }
+  .bubble-text h1, .bubble-text h2, .bubble-text h3 {
+  margin: 12px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #06746b;
+}
+.bubble-text p { margin-bottom: 10px; line-height: 1.7; }
+.bubble-text p:last-child { margin-bottom: 0; }
+.bubble-text ul, .bubble-text ol {
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+.bubble-text li { margin-bottom: 4px; line-height: 1.6; }
+.bubble-text code {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #7bb8f5;
+}
+.bubble-text pre {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 14px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.bubble-text pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: #081f6b;
+}
+.bubble-text strong { color: #77ab0f; font-weight: 600; }
+.bubble-text em { color: #0d6ca7; font-style: italic; }
+.bubble-text blockquote {
+  border-left: 3px solid #2e3e50;
+  padding-left: 12px;
+  color: #880b0b;
+  margin: 8px 0;
+}
+.bubble-text a { color: #5b9bd5; text-decoration: underline; }
 `}</style>
 
       <div className="app">
@@ -1067,7 +1113,7 @@ textarea::placeholder {
                           <div className="dot" /><div className="dot" /><div className="dot" />
                         </div>
                       ) : (
-                          <div className="bubble-text"><ReactMarkdown>{m.content}</ReactMarkdown></div>
+                          <div className="bubble-text"><ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown></div>
                       )}
                     </div>
                   </div>
