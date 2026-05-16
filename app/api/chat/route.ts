@@ -1,7 +1,6 @@
 import { createGroq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import clientPromise from '@/lib/mongodb';
-import { pipeline } from '@xenova/transformers';
 
 const groq = createGroq();
 
@@ -9,6 +8,7 @@ let embedder: any = null;
 
 async function getEmbedder() {
     if (!embedder) {
+        const { pipeline } = await import('@xenova/transformers');
         embedder = await pipeline(
             'feature-extraction',
             'Xenova/all-MiniLM-L6-v2'
