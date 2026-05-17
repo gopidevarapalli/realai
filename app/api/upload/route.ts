@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-
+const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 // Pure JS embedding — no external API, no packages
 // Works on Vercel, localhost, anywhere
 
@@ -72,40 +72,46 @@ export async function POST(req: NextRequest) {
         const file = formData.get('file') as File;
         if (!file) return Response.json({ error: 'No file provided' }, { status: 400 });
 
+        // Convert file to buffer
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        const blob = new Blob([buffer], { type: 'application/pdf' });
-        const loader = new PDFLoader(blob);
-        const docs = await loader.load();
+        // ✅ Parse PDF directly — no LangChain PDFLoader needed
+        const pdfData = await pdfParse(buffer);
+        const fullText = pdfData.text;
 
+        console.log(`PDF parsed: ${pdfData.numpages} pages, ${fullText.length} chars`);
+
+        // Split into chunks
         const splitter = new RecursiveCharacterTextSplitter({
             chunkSize: 500,
             chunkOverlap: 50,
         });
-        const chunks = await splitter.splitDocuments(docs);
-        console.log(`PDF parsed: ${chunks.length} chunks`);
+        const chunks = await splitter.createDocuments([fullText]);
 
+        console.log(`Split into ${chunks.length} chunks`);
+
+        // Embed each chunk
         const rows = await Promise.all(
-            chunks.map(async (chunk) => ({
-                content: chunk.pageContent,
-                embedding: await embedText(chunk.pageContent),
-                metadata: {
-                    filename: file.name,
-                    page: chunk.metadata?.loc?.pageNumber || 0,
-                },
-                createdAt: new Date(),
-            }))
-        );
+          chunks.map(async (chunk, index) => ({
+              content: chunk.pageContent,
+            embedding: embedText(chunk.pageContent),
+            metadata: {
+                filename: file.name,
+                page: Math.floor(index / 3) + 1, // approximate page
+                chunkIndex: index,
+            },
+            createdAt: new Date(),
+        }))
+      );
 
+        // Ensure text index exists
         const client = await clientPromise;
         const collection = client.db('realai').collection('documents');
-        // Ensure text index exists for full-text search
         try {
             await collection.createIndex({ content: 'text' });
-        } catch {
-            // Index already exists — fine
-        }
+        } catch { /* already exists */ }
+
         await collection.insertMany(rows);
 
         return Response.json({
