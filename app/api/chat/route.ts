@@ -1,82 +1,157 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Direct execution layers for local WASM pipelines
-process.env.TRANSFORMERS_NO_NODE = "1";
-process.env.XENOVA_DIST_ONLY = "1";
-
 import { createGroq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import clientPromise from '@/lib/mongodb';
 
 const groq = createGroq();
-let embedder: any = null;
 
-async function getEmbedder() {
-    if (!embedder) {
-        const transformers = await import('@xenova/transformers');
-        const env = transformers.env;
-        const pipeline = transformers.pipeline;
 
-        // Route to public CDN layers for browser/WASM binaries
-        env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-        env.allowLocalModels = false;
-        env.useBrowserCache = false;
-        env.backends.onnx.wasm.numThreads = 1;
+// Pure JS embedding — no external API, no packages
+// Works on Vercel, localhost, anywhere
 
-        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+function hashCode(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash; // convert to 32-bit int
     }
-    return embedder;
+    return Math.abs(hash);
 }
 
-async function embedText(text: string): Promise<number[]> {
-    const embed = await getEmbedder();
-    const output = await embed(text, {
-        pooling: 'mean',
-        normalize: true,
-    });
-    return Array.from(output.data);
+function embedText(text: string, dimensions = 384): number[] {
+    const vector = new Array(dimensions).fill(0);
+
+    // Clean and tokenize
+    const words = text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+
+    const tokens: string[] = [];
+
+    for (const word of words) {
+        // Add full word
+        tokens.push(word);
+
+        // Add character n-grams (2, 3, 4 chars) for better matching
+        for (let n = 2; n <= 4; n++) {
+            for (let i = 0; i <= word.length - n; i++) {
+                tokens.push(word.slice(i, i + n));
+            }
+        }
+
+        // Add bigrams (pairs of words) for context
+        const idx = words.indexOf(word);
+        if (idx < words.length - 1) {
+            tokens.push(`${word}_${words[idx + 1]}`);
+        }
+    }
+
+    // Hash each token into the vector
+    for (const token of tokens) {
+        const index = hashCode(token) % dimensions;
+        vector[index] += 1;
+    }
+
+    // L2 normalize so cosine similarity works correctly
+    const magnitude = Math.sqrt(
+        vector.reduce((sum, val) => sum + val * val, 0)
+    );
+
+    if (magnitude > 0) {
+        for (let i = 0; i < dimensions; i++) {
+            vector[i] = vector[i] / magnitude;
+        }
+    }
+
+    return vector;
 }
 
 async function searchDocuments(query: string): Promise<string> {
     try {
-        console.log('query=', query);
-        const queryEmbedding = await embedText(query);
+      const client = await clientPromise;
+      const collection = client.db('realai').collection('documents');
 
-        const client = await clientPromise;
-        const collection = client.db('realai').collection('documents');
+      const totalDocs = await collection.countDocuments();
+      if (totalDocs === 0) return '';
 
-        const results = await collection.aggregate([
-            {
-                $vectorSearch: {
-                    index: 'vector_index',
-                    path: 'embedding',
-                    queryVector: queryEmbedding,
-                    numCandidates: 50,
-                    limit: 4,
-                },
-            },
-            {
-                $project: {
-                    content: 1,
-                    metadata: 1,
-                    score: { $meta: 'vectorSearchScore' },
-                },
-            },
-        ]).toArray();
+      // ── Small PDF (≤ 30 chunks): send everything to LLM ──
+      if (totalDocs <= 30) {
+          const allDocs = await collection
+              .find({})
+              .sort({ 'metadata.page': 1 })
+              .toArray();
+          return allDocs
+              .map((r: any) => `[Page ${r.metadata?.page || '?'}]: ${r.content}`)
+              .join('\n\n---\n\n');
+      }
 
-        if (!results.length) return '';
+      // ── Large PDF: hybrid text + vector search ──
+      const results: Map<string, any> = new Map();
 
-        return results
-            .map((r: any) => `[Page ${r.metadata?.page || '?'}]: ${r.content}`)
-            .join('\n\n---\n\n');
-    } catch (err) {
-        console.error('Vector search error:', err);
-        return '';
-    }
+      // 1. MongoDB full-text search (keyword matching — great for specific terms)
+      try {
+          const textResults = await collection
+              .find(
+                  { $text: { $search: query } },
+                  { projection: { score: { $meta: 'textScore' }, content: 1, metadata: 1 } }
+              )
+              .sort({ score: { $meta: 'textScore' } })
+              .limit(4)
+              .toArray();
+
+          textResults.forEach((r: any) => results.set(r._id.toString(), r));
+      } catch {
+          // Text index doesn't exist yet — create it silently
+          await collection.createIndex({ content: 'text' });
+          console.log('Text index created');
+      }
+
+      // 2. Vector search (semantic matching)
+      try {
+          const queryEmbedding = embedText(query);
+          const vectorResults = await collection.aggregate([
+              {
+                  $vectorSearch: {
+                      index: 'vector_index',
+                      path: 'embedding',
+                      queryVector: queryEmbedding,
+                  numCandidates: 100,
+                  limit: 4,
+              },
+          },
+          {
+              $project: {
+                  content: 1,
+                  metadata: 1,
+                  score: { $meta: 'vectorSearchScore' },
+              },
+          },
+      ]).toArray();
+
+          vectorResults.forEach((r: any) => results.set(r._id.toString(), r));
+      } catch (e) {
+          console.error('Vector search error:', e);
+      }
+
+      if (results.size === 0) return '';
+
+      // Sort by page number and return combined unique results
+      return Array.from(results.values())
+          .sort((a, b) => (a.metadata?.page || 0) - (b.metadata?.page || 0))
+          .slice(0, 6)
+          .map((r: any) => `[Page ${r.metadata?.page || '?'}]: ${r.content}`)
+          .join('\n\n---\n\n');
+
+  } catch (err) {
+      console.error('Search error:', err);
+      return '';
+  }
 }
 
 export async function POST(req: Request) {
+    console.log('HF_API_KEY exists:', !!process.env.HF_API_KEY)
     const { messages, memory } = await req.json();
     const lastMessage = messages[messages.length - 1]?.content || '';
     const context = await searchDocuments(lastMessage);
@@ -95,7 +170,7 @@ ${memory?.customInstruction || ''}
 
 ${memory?.englishLearner ? 'The user is learning English. Politely correct grammar mistakes before answering.' : ''}
 
-${context ? `\n## Relevant context from uploaded PDF:\n${context}\n\nUse this context to answer accurately.\nMention page numbers when referencing the document.\n\nIf answer is not found in context, answer from your own knowledge.\n` : ''}
+${context ? `\n## Relevant context from uploaded PDF:\n${context}\n\nUse this context to answer accurately. Mention page numbers when referencing the document.\n` : ''}
 
 Never say you cannot remember user information.`.trim();
 
