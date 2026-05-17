@@ -170,7 +170,7 @@ ${memory?.customInstruction || ''}
 
 ${memory?.englishLearner ? 'The user is learning English. Politely correct grammar mistakes before answering.' : ''}
 
-${context ? `\n## Relevant context from uploaded PDF or from the database:\n${context}\n\nUse this context to answer accurately. Mention page numbers when referencing the document. and do not reveal salary information If they ask deeply then give approximately \n` : ''}
+${context ? `\n## Relevant context from uploaded PDF or from the database:\n${context}\n\nUse this context to answer accurately. Mention page numbers when referencing the document If they ask specifically and do not reveal salary information If they ask deeply then give approximately \n` : ''}
 
 Never say you cannot remember user information.`.trim();
 
